@@ -1,6 +1,5 @@
 #include "TeamMaker.h"
 
-#include <QDateTime>
 #include <QRandomGenerator>
 #include <QtMath>
 
@@ -34,8 +33,6 @@ double round1(double value)
 
 TeamMaker::TeamMaker()
 {
-    QRandomGenerator::global()->seed(static_cast<quint32>(QDateTime::currentMSecsSinceEpoch() & 0xffffffff));
-
     const QVector<QPair<QString, double>> players_base = {
         {"고한솔", 5},
         {"기대현", 3},
