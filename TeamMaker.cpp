@@ -1,12 +1,42 @@
 #include "TeamMaker.h"
 
-#include <QRandomGenerator>
 #include <QtMath>
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
+#include <random>
 
 namespace {
+
+constexpr double kNearAbsDefault = 0.30;
+constexpr double kNearRelDefault = 0.05;
+constexpr int kNearTopKDefault = 200;
+
+struct EvalResult {
+    QVector<QVector<PlayerInfo>> teams;
+    QVector<double> teamSums;
+    TeamMetrics metrics;
+};
+
+struct BestPool {
+    double bestScore = std::numeric_limits<double>::max();
+    double nearAbs = kNearAbsDefault;
+    double nearRel = kNearRelDefault;
+    int nearTopK = kNearTopKDefault;
+    QVector<EvalResult> candidates;
+
+    bool isNear(double score) const
+    {
+        if (bestScore == std::numeric_limits<double>::max()) {
+            return true;
+        }
+        const double absGap = score - bestScore;
+        const double relBase = qMax(qAbs(bestScore), 1e-9);
+        const double relGap = absGap / relBase;
+        return absGap <= nearAbs || relGap <= nearRel;
+    }
+};
 
 double winRateAdjustment(int games, int wins)
 {
@@ -187,40 +217,70 @@ TeamResult TeamMaker::makeTeams(const QVector<QString>& selectedNames) const
     QVector<QVector<PlayerInfo>> teams(teamCount);
     QVector<double> teamSums(teamCount, 0.0);
 
-    for (const auto& player : selectedPlayers) {
-        double bestImbalance = std::numeric_limits<double>::max();
-        QVector<int> candidateTeams;
+    BestPool pool;
+    auto searchBestPartitionRec = [&](auto&& self,
+                                      int playerIndex,
+                                      QVector<QVector<PlayerInfo>>& curTeams,
+                                      QVector<double>& curSums) -> void {
+        if (playerIndex >= selectedPlayers.size()) {
+            EvalResult cur;
+            cur.teams = curTeams;
+            cur.teamSums = curSums;
+            cur.metrics = calculateMetrics(cur.teams, cur.teamSums);
 
-        for (int t = 0; t < teamCount; ++t) {
-            QVector<double> trial = teamSums;
-            trial[t] += player.adjustedScore;
-            const double mx = *std::max_element(trial.begin(), trial.end());
-            const double mn = *std::min_element(trial.begin(), trial.end());
-            const double imbalance = mx - mn;
-
-            if (imbalance + 1e-9 < bestImbalance) {
-                bestImbalance = imbalance;
-                candidateTeams = {t};
-            } else if (qAbs(imbalance - bestImbalance) < 1e-9) {
-                candidateTeams.push_back(t);
+            if (cur.metrics.score + 1e-9 < pool.bestScore) {
+                pool.bestScore = cur.metrics.score;
+                pool.candidates.clear();
+                pool.candidates.push_back(cur);
+            } else if (pool.isNear(cur.metrics.score)) {
+                pool.candidates.push_back(cur);
             }
+            return;
         }
 
-        int pickedIndex = candidateTeams[0];
-        if (candidateTeams.size() > 1) {
-            const int r = QRandomGenerator::global()->bounded(candidateTeams.size());
-            pickedIndex = candidateTeams[r];
-        }
+        const PlayerInfo& p = selectedPlayers[playerIndex];
+        for (int t = 0; t < curTeams.size(); ++t) {
+            curTeams[t].push_back(p);
+            curSums[t] += p.adjustedScore;
 
-        teams[pickedIndex].push_back(player);
-        teamSums[pickedIndex] += player.adjustedScore;
+            self(self, playerIndex + 1, curTeams, curSums);
+
+            curSums[t] -= p.adjustedScore;
+            curTeams[t].pop_back();
+        }
+    };
+    searchBestPartitionRec(searchBestPartitionRec, 0, teams, teamSums);
+
+    if (pool.candidates.isEmpty()) {
+        return result;
     }
 
-    result.metrics = calculateMetrics(teams, teamSums);
+    if (pool.candidates.size() > pool.nearTopK) {
+        std::nth_element(pool.candidates.begin(),
+                         pool.candidates.begin() + pool.nearTopK,
+                         pool.candidates.end(),
+                         [](const EvalResult& a, const EvalResult& b) {
+                             return a.metrics.score < b.metrics.score;
+                         });
+        pool.candidates.resize(pool.nearTopK);
+    }
 
-    for (int teamIdx = 0; teamIdx < teams.size(); ++teamIdx) {
-        const double sum = round1(teamSums[teamIdx]);
-        for (const auto& p : teams[teamIdx]) {
+    const auto seed = static_cast<std::mt19937::result_type>(
+        std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<int> dist(0, pool.candidates.size() - 1);
+    const EvalResult picked = pool.candidates[dist(rng)];
+
+    result.metrics = picked.metrics;
+    result.metrics.bestScore = round1(pool.bestScore);
+    result.metrics.candidateCount = pool.candidates.size();
+    result.metrics.nearAbs = pool.nearAbs;
+    result.metrics.nearRel = pool.nearRel;
+    result.metrics.nearTopK = pool.nearTopK;
+
+    for (int teamIdx = 0; teamIdx < picked.teams.size(); ++teamIdx) {
+        const double sum = round1(picked.teamSums[teamIdx]);
+        for (const auto& p : picked.teams[teamIdx]) {
             result.rows.push_back({teamIdx + 1, p.name, round1(p.adjustedScore), sum});
         }
     }

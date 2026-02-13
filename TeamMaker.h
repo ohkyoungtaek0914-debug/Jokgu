@@ -27,6 +27,11 @@ struct TeamMetrics {
     double diffBottom2;
     double varSum;
     double score;
+    double bestScore;
+    int candidateCount;
+    double nearAbs;
+    double nearRel;
+    int nearTopK;
 };
 
 struct TeamResult {

@@ -114,11 +114,21 @@ void MainWindow::onMakeTeams()
                        "diff_top2: %3\n"
                        "diff_bottom2: %4\n"
                        "var_sum: %5\n"
-                       "score: %6")
+                       "score: %6\n"
+                       "bestScore: %7\n"
+                       "candidateCount: %8\n"
+                       "nearAbs: %9\n"
+                       "nearRel: %10\n"
+                       "K: %11")
             .arg(m.diffSum, 0, 'f', 1)
             .arg(m.diffAvg, 0, 'f', 1)
             .arg(m.diffTop2, 0, 'f', 1)
             .arg(m.diffBottom2, 0, 'f', 1)
             .arg(m.varSum, 0, 'f', 1)
-            .arg(m.score, 0, 'f', 1));
+            .arg(m.score, 0, 'f', 1)
+            .arg(m.bestScore, 0, 'f', 1)
+            .arg(m.candidateCount)
+            .arg(m.nearAbs, 0, 'f', 2)
+            .arg(m.nearRel, 0, 'f', 2)
+            .arg(m.nearTopK));
 }
