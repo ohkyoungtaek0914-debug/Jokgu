@@ -21,10 +21,16 @@ set(PROJECT_SOURCES
     TeamMaker.h
 )
 
-qt_add_executable(jokgu
-    MANUAL_FINALIZATION
-    ${PROJECT_SOURCES}
-)
+if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    qt_add_executable(jokgu
+        MANUAL_FINALIZATION
+        ${PROJECT_SOURCES}
+    )
+else()
+    add_executable(jokgu
+        ${PROJECT_SOURCES}
+    )
+endif()
 
 target_link_libraries(jokgu PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
@@ -39,4 +45,6 @@ install(TARGETS jokgu
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-qt_finalize_executable(jokgu)
+if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
+    qt_finalize_executable(jokgu)
+endif()
