@@ -1,0 +1,27 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+
+# Build outputs
+Debug/
+Release/
+x64/
+Win32/
+build/
+*.exe
+*.obj
+*.pdb
+
+# Qt
+*.pro.user*
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# Logs
+*.log
+history.csv
+history.csv
