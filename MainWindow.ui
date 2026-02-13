@@ -6,21 +6,114 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>980</width>
+    <height>640</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Jokgu Team Maker</string>
   </property>
-  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <item>
+     <widget class="QGroupBox" name="groupPlayers">
+      <property name="title">
+       <string>참가자</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayoutPlayers">
+       <item>
+        <widget class="QLineEdit" name="EDT_FILTER">
+         <property name="placeholderText">
+          <string>이름 필터</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListWidget" name="LIST_PLAYERS"/>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayoutButtons">
+         <item>
+          <widget class="QPushButton" name="BTN_ALL">
+           <property name="text">
+            <string>전체 선택</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="BTN_NONE">
+           <property name="text">
+            <string>전체 해제</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupResult">
+      <property name="title">
+       <string>팀 편성 결과</string>
+      </property>
+      <layout class="QVBoxLayout" name="verticalLayoutResult">
+       <item>
+        <widget class="QPushButton" name="BTN_MAKE">
+         <property name="text">
+          <string>팀 만들기</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="TABLE_RESULT">
+         <property name="columnCount">
+          <number>4</number>
+         </property>
+         <property name="rowCount">
+          <number>0</number>
+         </property>
+         <column>
+          <property name="text">
+           <string>Team</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Name</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Score</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>TeamSum</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPlainTextEdit" name="TXT_LOG">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>800</width>
-     <height>22</height>
+     <width>980</width>
+     <height>27</height>
     </rect>
    </property>
   </widget>
