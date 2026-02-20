@@ -28,10 +28,7 @@ void MainWindow::loadPlayers()
     ui->LIST_PLAYERS->clear();
 
     for (const PlayerInfo& player : m_teamMaker.allPlayers()) {
-        auto *item = new QListWidgetItem(QStringLiteral("%1 (%2->%3)")
-                                             .arg(player.name)
-                                             .arg(player.baseScore, 0, 'f', 1)
-                                             .arg(player.adjustedScore, 0, 'f', 1));
+        auto *item = new QListWidgetItem(player.name);
         item->setData(Qt::UserRole, player.name);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
         item->setCheckState(Qt::Unchecked);
@@ -101,8 +98,7 @@ void MainWindow::onMakeTeams()
 
         ui->TABLE_RESULT->setItem(row, 0, new QTableWidgetItem(QString::number(p.teamIndex)));
         ui->TABLE_RESULT->setItem(row, 1, new QTableWidgetItem(p.name));
-        ui->TABLE_RESULT->setItem(row, 2, new QTableWidgetItem(QString::number(p.adjustedScore, 'f', 1)));
-        ui->TABLE_RESULT->setItem(row, 3, new QTableWidgetItem(QString::number(p.teamSum, 'f', 1)));
+        ui->TABLE_RESULT->setItem(row, 2, new QTableWidgetItem(QString::number(p.teamSum, 'f', 1)));
     }
 
     ui->TABLE_RESULT->resizeColumnsToContents();
