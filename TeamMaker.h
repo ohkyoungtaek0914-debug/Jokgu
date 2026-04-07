@@ -7,16 +7,18 @@
 
 struct PlayerInfo {
     QString name;
-    double baseScore;
-    int games;
+    double skillScore;
+    double winRateScore;
+    double finalScore;
     int wins;
-    double adjustedScore;
+    int losses;
+    int games;
 };
 
 struct TeamPlayer {
     int teamIndex;
     QString name;
-    double adjustedScore;
+    double finalScore;
     double teamSum;
 };
 
@@ -29,6 +31,7 @@ struct TeamMetrics {
     double score;
     double bestScore;
     int candidateCount;
+    int selectedCandidateIndex;
     double nearAbs;
     double nearRel;
     int nearTopK;
@@ -36,6 +39,7 @@ struct TeamMetrics {
 
 struct TeamResult {
     QVector<TeamPlayer> rows;
+    QVector<double> teamSums;
     TeamMetrics metrics;
 };
 

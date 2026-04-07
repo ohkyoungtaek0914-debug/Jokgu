@@ -3,15 +3,21 @@
 #include <QtMath>
 
 #include <algorithm>
-#include <chrono>
 #include <limits>
 #include <random>
 
 namespace {
 
-constexpr double kNearAbsDefault = 0.30;
-constexpr double kNearRelDefault = 0.05;
+constexpr double kNearAbsDefault = 0.50;
+constexpr double kNearRelDefault = 0.10;
 constexpr int kNearTopKDefault = 200;
+constexpr int kFallbackTopN = 10;
+
+std::mt19937& globalRng()
+{
+    static std::mt19937 rng(std::random_device{}());
+    return rng;
+}
 
 struct EvalResult {
     QVector<QVector<PlayerInfo>> teams;
@@ -38,25 +44,26 @@ struct BestPool {
     }
 };
 
-double winRateAdjustment(int games, int wins)
-{
-    if (games <= 0) {
-        return 0.0;
-    }
-
-    const double winRate = static_cast<double>(wins) / static_cast<double>(games);
-    if (winRate >= 0.8) return 1.0;
-    if (winRate >= 0.65) return 0.6;
-    if (winRate >= 0.55) return 0.3;
-    if (winRate >= 0.45) return 0.0;
-    if (winRate >= 0.35) return -0.3;
-    if (winRate >= 0.2) return -0.6;
-    return -1.0;
-}
-
 double round1(double value)
 {
     return qRound(value * 10.0) / 10.0;
+}
+
+double clamp01(double value)
+{
+    return qBound(0.0, value, 1.0);
+}
+
+double calculateWinRateScore(int wins, int losses)
+{
+    const int games = wins + losses;
+    const double raw = (games > 0)
+        ? static_cast<double>(wins) / static_cast<double>(games)
+        : 0.5;
+    const double confidence = clamp01(static_cast<double>(games) / 10.0);
+    const double rate = 0.5 * (1.0 - confidence) + raw * confidence;
+    const double score = 1.0 + 4.0 * rate;
+    return round1(qBound(1.0, score, 5.0));
 }
 
 } // namespace
@@ -68,38 +75,40 @@ TeamMaker::TeamMaker()
         {"기대현", 3},
         {"김도헌", 2},
         {"김동윤", 4},
-        {"김세현", 4},
+        {"김세현", 5},
         {"문지환", 3},
-        {"박승우", 3},
+        {"박승우", 4},
         {"박주환", 5},
         {"박준혁", 4},
-        {"양재원", 4},
+        {"양재원", 5},
         {"오경택", 4},
         {"이규빈", 3},
         {"이상오", 5},
         {"이종균", 5},
         {"이재상", 5},
         {"이창준", 4},
+        {"유경두", 5},
         {"조재경", 2}
     };
 
     const QMap<QString, QPair<int, int>> records = {
-        {"고한솔", {12, 4}},
-        {"기대현", {7, 7}},
-        {"김도헌", {0, 1}},
-        {"김동윤", {6, 6}},
-        {"김세현", {11, 4}},
-        {"문지환", {0, 3}},
-        {"박승우", {3, 1}},
-        {"박주환", {6, 10}},
-        {"박준혁", {2, 1}},
-        {"양재원", {8, 5}},
-        {"오경택", {11, 5}},
+        {"고한솔", {0, 3}},
+        {"기대현", {2, 1}},
+        {"김도헌", {0, 2}},
+        {"김동윤", {1, 0}},
+        {"김세현", {3, 1}},
+        {"문지환", {1, 3}},
+        {"박승우", {1, 1}},
+        {"박주환", {2, 1}},
+        {"박준혁", {0, 2}},
+        {"양재원", {3, 0}},
+        {"오경택", {2, 2}},
         {"이규빈", {1, 0}},
-        {"이상오", {3, 4}},
-        {"이종균", {4, 4}},
+        {"이상오", {4, 4}},
+        {"이종균", {5, 4}},
         {"이재상", {2, 1}},
-        {"이창준", {2, 9}},
+        {"이창준", {0, 2}},
+        {"유경두", {0, 0}},
         {"조재경", {0, 1}}
     };
 
@@ -108,10 +117,12 @@ TeamMaker::TeamMaker()
         const auto rec = records.value(p.first, {0, 0});
         PlayerInfo info;
         info.name = p.first;
-        info.baseScore = p.second;
-        info.games = rec.first;
-        info.wins = rec.second;
-        info.adjustedScore = round1(info.baseScore + winRateAdjustment(info.games, info.wins));
+        info.skillScore = p.second;
+        info.wins = rec.first;
+        info.losses = rec.second;
+        info.games = info.wins + info.losses;
+        info.winRateScore = calculateWinRateScore(info.wins, info.losses);
+        info.finalScore = round1(info.skillScore + info.winRateScore);
         m_players.push_back(info);
         m_playerByName.insert(info.name, info);
     }
@@ -124,7 +135,7 @@ QVector<PlayerInfo> TeamMaker::allPlayers() const
 
 int TeamMaker::decide_team_count(int selectedCount) const
 {
-    return selectedCount >= 9 ? 3 : 2;
+    return selectedCount >= 11 ? 3 : 2;
 }
 
 TeamMetrics TeamMaker::calculateMetrics(const QVector<QVector<PlayerInfo>>& teams,
@@ -157,13 +168,17 @@ TeamMetrics TeamMaker::calculateMetrics(const QVector<QVector<PlayerInfo>>& team
 
     for (const auto& team : teams) {
         QVector<double> scores;
-        for (const auto& p : team) scores.push_back(p.adjustedScore);
+        for (const auto& p : team) {
+            scores.push_back(p.finalScore);
+        }
         std::sort(scores.begin(), scores.end(), std::greater<double>());
 
         double top2 = 0.0;
         double bottom2 = 0.0;
-        for (int i = 0; i < std::min(2, scores.size()); ++i) top2 += scores[i];
-        for (int i = 0; i < std::min(2, scores.size()); ++i) bottom2 += scores[scores.size() - 1 - i];
+        for (int i = 0; i < std::min(2, scores.size()); ++i) {
+            top2 += scores[i];
+            bottom2 += scores[scores.size() - 1 - i];
+        }
 
         top2Sums.push_back(top2);
         bottom2Sums.push_back(bottom2);
@@ -175,7 +190,9 @@ TeamMetrics TeamMaker::calculateMetrics(const QVector<QVector<PlayerInfo>>& team
                            - *std::min_element(bottom2Sums.begin(), bottom2Sums.end()));
 
     double avgSum = 0.0;
-    for (double s : teamSums) avgSum += s;
+    for (double s : teamSums) {
+        avgSum += s;
+    }
     avgSum /= teamSums.size();
 
     double variance = 0.0;
@@ -206,9 +223,10 @@ TeamResult TeamMaker::makeTeams(const QVector<QString>& selectedNames) const
         return result;
     }
 
-    std::sort(selectedPlayers.begin(), selectedPlayers.end(), [](const PlayerInfo& a, const PlayerInfo& b) {
-        if (!qFuzzyCompare(a.adjustedScore + 1.0, b.adjustedScore + 1.0)) {
-            return a.adjustedScore > b.adjustedScore;
+    std::shuffle(selectedPlayers.begin(), selectedPlayers.end(), globalRng());
+    std::stable_sort(selectedPlayers.begin(), selectedPlayers.end(), [](const PlayerInfo& a, const PlayerInfo& b) {
+        if (!qFuzzyCompare(a.finalScore + 1.0, b.finalScore + 1.0)) {
+            return a.finalScore > b.finalScore;
         }
         return a.name < b.name;
     });
@@ -218,6 +236,7 @@ TeamResult TeamMaker::makeTeams(const QVector<QString>& selectedNames) const
     QVector<double> teamSums(teamCount, 0.0);
 
     BestPool pool;
+    QVector<EvalResult> allResults;
     auto searchBestPartitionRec = [&](auto&& self,
                                       int playerIndex,
                                       QVector<QVector<PlayerInfo>>& curTeams,
@@ -227,6 +246,8 @@ TeamResult TeamMaker::makeTeams(const QVector<QString>& selectedNames) const
             cur.teams = curTeams;
             cur.teamSums = curSums;
             cur.metrics = calculateMetrics(cur.teams, cur.teamSums);
+
+            allResults.push_back(cur);
 
             if (cur.metrics.score + 1e-9 < pool.bestScore) {
                 pool.bestScore = cur.metrics.score;
@@ -241,11 +262,11 @@ TeamResult TeamMaker::makeTeams(const QVector<QString>& selectedNames) const
         const PlayerInfo& p = selectedPlayers[playerIndex];
         for (int t = 0; t < curTeams.size(); ++t) {
             curTeams[t].push_back(p);
-            curSums[t] += p.adjustedScore;
+            curSums[t] += p.finalScore;
 
             self(self, playerIndex + 1, curTeams, curSums);
 
-            curSums[t] -= p.adjustedScore;
+            curSums[t] -= p.finalScore;
             curTeams[t].pop_back();
         }
     };
@@ -265,29 +286,44 @@ TeamResult TeamMaker::makeTeams(const QVector<QString>& selectedNames) const
         pool.candidates.resize(pool.nearTopK);
     }
 
-    const auto seed = static_cast<std::mt19937::result_type>(
-        std::chrono::high_resolution_clock::now().time_since_epoch().count());
-    std::mt19937 rng(seed);
-    std::uniform_int_distribution<int> dist(0, pool.candidates.size() - 1);
-    const EvalResult picked = pool.candidates[dist(rng)];
+    QVector<EvalResult> candidatePool = pool.candidates;
+    if (pool.candidates.size() <= 2 && !allResults.isEmpty()) {
+        std::sort(allResults.begin(), allResults.end(), [](const EvalResult& a, const EvalResult& b) {
+            return a.metrics.score < b.metrics.score;
+        });
+        const int fallbackCount = std::min(kFallbackTopN, allResults.size());
+        candidatePool = allResults.mid(0, fallbackCount);
+    }
+
+    std::uniform_int_distribution<int> dist(0, candidatePool.size() - 1);
+    const int pickedCandidateIndex = dist(globalRng());
+    const EvalResult picked = candidatePool[pickedCandidateIndex];
 
     result.metrics = picked.metrics;
     result.metrics.bestScore = round1(pool.bestScore);
-    result.metrics.candidateCount = pool.candidates.size();
+    result.metrics.candidateCount = candidatePool.size();
+    result.metrics.selectedCandidateIndex = pickedCandidateIndex;
     result.metrics.nearAbs = pool.nearAbs;
     result.metrics.nearRel = pool.nearRel;
     result.metrics.nearTopK = pool.nearTopK;
 
+    result.teamSums.reserve(picked.teamSums.size());
+    for (double sum : picked.teamSums) {
+        result.teamSums.push_back(round1(sum));
+    }
+
     for (int teamIdx = 0; teamIdx < picked.teams.size(); ++teamIdx) {
         const double sum = round1(picked.teamSums[teamIdx]);
         for (const auto& p : picked.teams[teamIdx]) {
-            result.rows.push_back({teamIdx + 1, p.name, round1(p.adjustedScore), sum});
+            result.rows.push_back({teamIdx + 1, p.name, round1(p.finalScore), sum});
         }
     }
 
     std::sort(result.rows.begin(), result.rows.end(), [](const TeamPlayer& a, const TeamPlayer& b) {
-        if (a.teamIndex != b.teamIndex) return a.teamIndex < b.teamIndex;
-        return a.adjustedScore > b.adjustedScore;
+        if (a.teamIndex != b.teamIndex) {
+            return a.teamIndex < b.teamIndex;
+        }
+        return a.finalScore > b.finalScore;
     });
 
     return result;

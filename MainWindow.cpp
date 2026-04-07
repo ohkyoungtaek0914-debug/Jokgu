@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 
+#include <QMap>
 #include <QMessageBox>
 #include <QStringList>
 
@@ -90,6 +91,12 @@ void MainWindow::onMakeTeams()
         return;
     }
 
+    QVector<PlayerInfo> allPlayers = m_teamMaker.allPlayers();
+    QMap<QString, PlayerInfo> playerByName;
+    for (const auto& player : allPlayers) {
+        playerByName.insert(player.name, player);
+    }
+
     const TeamResult result = m_teamMaker.makeTeams(selectedNames);
 
     ui->TABLE_RESULT->setRowCount(result.rows.size());
@@ -104,27 +111,52 @@ void MainWindow::onMakeTeams()
     ui->TABLE_RESULT->resizeColumnsToContents();
 
     const TeamMetrics& m = result.metrics;
+    QStringList teamLines;
+    for (int i = 0; i < result.teamSums.size(); ++i) {
+        teamLines << QStringLiteral("team%1_sum: %2").arg(i + 1).arg(result.teamSums[i], 0, 'f', 1);
+    }
+
+    QStringList playerLines;
+    for (const auto& name : selectedNames) {
+        if (!playerByName.contains(name)) {
+            continue;
+        }
+        const PlayerInfo& p = playerByName[name];
+        playerLines << QStringLiteral("%1 skill:%2 winRateScore:%3 final:%4 wins:%5 losses:%6 games:%7")
+                           .arg(p.name)
+                           .arg(p.skillScore, 0, 'f', 1)
+                           .arg(p.winRateScore, 0, 'f', 1)
+                           .arg(p.finalScore, 0, 'f', 1)
+                           .arg(p.wins)
+                           .arg(p.losses)
+                           .arg(p.games);
+    }
+
     ui->TXT_LOG->setPlainText(
-        QStringLiteral("diff_sum: %1\n"
-                       "diff_avg: %2\n"
-                       "diff_top2: %3\n"
-                       "diff_bottom2: %4\n"
+        QStringLiteral("%1\n"
+                       "max-min diff: %2\n"
+                       "top2 diff: %3\n"
+                       "bottom2 diff: %4\n"
                        "var_sum: %5\n"
                        "score: %6\n"
                        "bestScore: %7\n"
                        "candidateCount: %8\n"
-                       "nearAbs: %9\n"
-                       "nearRel: %10\n"
-                       "K: %11")
+                       "selectedCandidate: %9\n"
+                       "nearAbs: %10\n"
+                       "nearRel: %11\n"
+                       "K: %12\n\n"
+                       "[players]\n%13")
+            .arg(teamLines.join(QStringLiteral("\n")))
             .arg(m.diffSum, 0, 'f', 1)
-            .arg(m.diffAvg, 0, 'f', 1)
             .arg(m.diffTop2, 0, 'f', 1)
             .arg(m.diffBottom2, 0, 'f', 1)
             .arg(m.varSum, 0, 'f', 1)
             .arg(m.score, 0, 'f', 1)
             .arg(m.bestScore, 0, 'f', 1)
             .arg(m.candidateCount)
+            .arg(m.selectedCandidateIndex)
             .arg(m.nearAbs, 0, 'f', 2)
             .arg(m.nearRel, 0, 'f', 2)
-            .arg(m.nearTopK));
+            .arg(m.nearTopK)
+            .arg(playerLines.join(QStringLiteral("\n"))));
 }
