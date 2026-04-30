@@ -86,8 +86,7 @@ void MainWindow::onMakeTeams()
     }
 
     if (selectedNames.size() < 2) {
-        QMessageBox::warning(this, QStringLiteral("선택 부족"),
-                             QStringLiteral("참가자를 2명 이상 선택해 주세요."));
+        QMessageBox::warning(this, QStringLiteral("선택 부족"), QStringLiteral("참가자를 2명 이상 선택해 주세요."));
         return;
     }
 
